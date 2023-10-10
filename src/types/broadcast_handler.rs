@@ -29,32 +29,45 @@ impl MessageHandler for BroadcastHandler {
                 ..
             } => {
                 self.messages.push(*message);
-                send(MessageResponse {
-                    dest: src.clone(),
-                    in_reply_to: *msg_id,
-                    payload: Payload::BroadcastOk,
-                });
-                for server in state.broadcast_topology[&state.node_id].iter() {
-                    send(MessageResponse {
-                        dest: state.node_id.clone(),
-                        in_reply_to: Option::None,
-                        payload: Payload::BroadcastIntern { message: *message },
-                    });
+                match state.broadcast_topology.get(src) {
+                    // Node is an internal Server Node
+                    Some(nodes) => {
+                        eprintln!(
+                            "Node {} forwarding Broadcast {} to {:?}",
+                            state.node_id, message, nodes
+                        );
+                        for server in nodes {
+                            send(MessageResponse {
+                                src: Option::Some(src.clone()),
+                                dest: server.clone(),
+                                in_reply_to: Option::None,
+                                payload: Payload::Broadcast { message: *message },
+                            });
+                        }
+                    }
+                    // Node is an external Client Node
+                    None => {
+                        send(MessageResponse {
+                            src: Option::None,
+                            dest: src.clone(),
+                            in_reply_to: *msg_id,
+                            payload: Payload::BroadcastOk,
+                        });
+                        let nodes = state.broadcast_topology[&state.node_id].iter();
+                        eprintln!(
+                            "Node {} sending first Broadcast {} to {:?}",
+                            state.node_id, message, nodes
+                        );
+                        for server in nodes {
+                            send(MessageResponse {
+                                src: Option::Some(state.node_id.clone()),
+                                dest: server.clone(),
+                                in_reply_to: Option::None,
+                                payload: Payload::Broadcast { message: *message },
+                            });
+                        }
+                    }
                 }
-            }
-            Packet {
-                src,
-                body:
-                    Message {
-                        payload: Payload::BroadcastIntern { message },
-                        ..
-                    },
-                ..
-            } => {
-                self.messages.push(*message);
-                // TODO: Send Internal Broadcast to other nodes in network
-                // NOTE: You have to set the "src" to the "src" of the incoming packet, not to this
-                // node's id. Probably have to add an Optional<String> to MessageResponse.
             }
             Packet {
                 src,
@@ -67,6 +80,7 @@ impl MessageHandler for BroadcastHandler {
                 ..
             } => {
                 send(MessageResponse {
+                    src: Option::None,
                     dest: src.clone(),
                     in_reply_to: *msg_id,
                     payload: Payload::ReadOk {

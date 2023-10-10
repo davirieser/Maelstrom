@@ -27,6 +27,7 @@ impl MessageHandler for GenerateHandler {
         } = packet
         {
             send(MessageResponse {
+                src: Option::None,
                 dest: src.clone(),
                 in_reply_to: *msg_id,
                 payload: Payload::GenerateOk {

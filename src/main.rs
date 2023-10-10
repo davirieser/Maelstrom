@@ -6,7 +6,6 @@ mod types;
 use types::{
     broadcast_handler::BroadcastHandler, echo_handler::EchoHandler,
     generate_handler::GenerateHandler, packet_handler::PacketHandler,
-    topology_handler::TopologyHandler,
 };
 
 fn main() {
@@ -21,13 +20,10 @@ fn main() {
     let mut echo_handler = EchoHandler {};
     // let mut generate_handler = GenerateHandler {};
     let mut broadcast_handler = BroadcastHandler { messages: vec![] };
-    let mut topology_handler = TopologyHandler {};
 
     handler.add_handler(&mut echo_handler);
     // handler.add_handler(&mut generate_handler);
     handler.add_handler(&mut broadcast_handler);
-
-    handler.add_handler(&mut topology_handler);
 
     handler.run();
 }

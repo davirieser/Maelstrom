@@ -27,6 +27,7 @@ impl MessageHandler for EchoHandler {
         } = packet
         {
             send(MessageResponse {
+                src: Option::None,
                 dest: src.clone(),
                 in_reply_to: *msg_id,
                 payload: Payload::EchoOk { echo: echo.clone() },

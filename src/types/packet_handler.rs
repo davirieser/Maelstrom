@@ -1,8 +1,7 @@
-
 use serde_json::de::{IoRead, StreamDeserializer};
+use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::io::{Read, Write};
-use std::cmp::Ordering;
 
 use crate::types::{
     message::Message, message_handler::MessageHandler, packet::Packet, payload::Payload,
@@ -21,6 +20,7 @@ pub struct NodeInfo {
 }
 
 pub struct MessageResponse {
+    pub src: Option<String>,
     pub dest: String,
     pub in_reply_to: Option<usize>,
     pub payload: Payload,
@@ -90,7 +90,7 @@ where
                 topology: Default::default(),
                 broadcast_topology: Default::default(),
             });
-            self.respond(src, msg_id, Payload::InitOk);
+            self.respond(Option::None, src, msg_id, Payload::InitOk);
         } else {
             panic!("Did not receive Init Message!");
         }
@@ -112,6 +112,7 @@ where
                     ..
                 })) => {
                     self.respond(
+                        Option::None,
                         src,
                         msg_id,
                         Payload::Error {
@@ -130,8 +131,7 @@ where
                         },
                     ..
                 })) => {
-                    eprintln!("Topology: {:?}", topology);
-                    self.respond(src, msg_id, Payload::TopologyOk {});
+                    self.respond(Option::None, src, msg_id, Payload::TopologyOk {});
                     let state = self
                         .state
                         .as_mut()
@@ -147,7 +147,12 @@ where
                         let mut closure = |r| responses.push(r);
                         handler.handle_message(&packet, self.state.as_ref().unwrap(), &mut closure);
                         for response in responses {
-                            self.respond(response.dest, response.in_reply_to, response.payload);
+                            self.respond(
+                                response.src,
+                                response.dest,
+                                response.in_reply_to,
+                                response.payload,
+                            );
                         }
                     }
 
@@ -165,13 +170,19 @@ where
             self.handle_message();
         }
     }
-    pub fn respond(&mut self, dest: String, in_reply_to: Option<usize>, payload: Payload) {
+    pub fn respond(
+        &mut self,
+        src: Option<String>,
+        dest: String,
+        in_reply_to: Option<usize>,
+        payload: Payload,
+    ) {
         let state = self
             .state
             .as_mut()
             .expect("Tried responding before Init Message");
-        let src = std::mem::take(&mut state.node_id);
 
+        let src = src.unwrap_or_else(|| state.node_id.clone());
         let response = Packet {
             dest,
             src,
@@ -184,13 +195,13 @@ where
 
         state.msg_number += 1;
 
-        let _ = self
-            .stdout
-            .write(serde_json::to_string(&response).unwrap().as_bytes());
+        let _ = self.stdout.write(
+            serde_json::to_string(&response)
+                .unwrap_or_else(|_| String::from(""))
+                .as_bytes(),
+        );
         let _ = self.stdout.write("\n".as_bytes());
         let _ = self.stdout.flush();
-
-        let _ = std::mem::replace(&mut state.node_id, response.src);
     }
 }
 
@@ -217,9 +228,18 @@ fn build_broadcast_topology(
         eprintln!("Node: {}", node_id);
 
         let mut stack: HashSet<String> = HashSet::from([node_id.clone()]);
-        eprintln!("{} < {} && {} && {}", already_visited.len(), num_nodes, !stack.is_empty(), !neighbours.is_empty());
+        eprintln!(
+            "{} < {} && {} && {}",
+            already_visited.len(),
+            num_nodes,
+            !stack.is_empty(),
+            !neighbours.is_empty()
+        );
         while (already_visited.len() < num_nodes && !stack.is_empty() && !neighbours.is_empty()) {
-            eprintln!("\tNeighbours: {:?}, Stack: {:?}, Already visited: {:?}", neighbours, stack, already_visited);
+            eprintln!(
+                "\tNeighbours: {:?}, Stack: {:?}, Already visited: {:?}",
+                neighbours, stack, already_visited
+            );
             let mut temp: HashSet<String> = HashSet::new();
 
             if stack.contains(own_node_id) {
@@ -267,30 +287,48 @@ mod test {
 
     #[test]
     fn test_build_broadcast_topology1() {
-        let topology : HashMap<String, Vec<String>> = HashMap::from([
-            (String::from("n0"), vec![String::from("n1"), String::from("n2")]),
-            (String::from("n1"), vec![String::from("n3"), String::from("n0")]),
-            (String::from("n2"), vec![String::from("n3"), String::from("n0")]),
-            (String::from("n3"), vec![String::from("n1"), String::from("n2")]),
+        let topology: HashMap<String, Vec<String>> = HashMap::from([
+            (
+                String::from("n0"),
+                vec![String::from("n1"), String::from("n2")],
+            ),
+            (
+                String::from("n1"),
+                vec![String::from("n3"), String::from("n0")],
+            ),
+            (
+                String::from("n2"),
+                vec![String::from("n3"), String::from("n0")],
+            ),
+            (
+                String::from("n3"),
+                vec![String::from("n1"), String::from("n2")],
+            ),
         ]);
-        let calculated : HashMap<String, Vec<String>> = HashMap::from([
-            (String::from("n0"), vec![String::from("n1"), String::from("n2")]),
+        let calculated: HashMap<String, Vec<String>> = HashMap::from([
+            (
+                String::from("n0"),
+                vec![String::from("n1"), String::from("n2")],
+            ),
             (String::from("n1"), vec![String::from("n2")]),
             (String::from("n2"), vec![String::from("n1")]),
             (String::from("n3"), vec![]),
         ]);
         // TODO: Need to calculate for "n1", "n2" and "n3"
 
-        let node_ids : Vec<String> = ["n0", "n1", "n2", "n3"].into_iter().map(|s| String::from(s)).collect();
+        let node_ids: Vec<String> = ["n0", "n1", "n2", "n3"]
+            .into_iter()
+            .map(|s| String::from(s))
+            .collect();
         let server_nodes = node_ids.clone();
 
         let mut state = NodeInfo {
             msg_number: 0,
             node_number: 4,
             node_id: String::from("n0"),
-            node_ids, 
+            node_ids,
             server_nodes,
-            client_nodes: vec![], 
+            client_nodes: vec![],
             topology: HashMap::new(),
             broadcast_topology: HashMap::new(),
         };
