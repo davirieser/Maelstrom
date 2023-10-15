@@ -1,11 +1,11 @@
-#![allow(unused, non_snake_case)]
+#![allow(non_snake_case)]
 
 use std::io::{stdin, stdout};
 
 mod types;
 use types::{
     broadcast_handler::BroadcastHandler, echo_handler::EchoHandler,
-    generate_handler::GenerateHandler, packet_handler::PacketHandler,
+    /* generate_handler::GenerateHandler, */ packet_handler::PacketHandler,
 };
 
 fn main() {
