@@ -1,11 +1,12 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::types::{message::Message, packet::Packet};
+use crate::types::packet::Packet;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Payload {
+    // NOTE: Standard Payloads
     Init {
         node_id: String,
         node_ids: Vec<String>,
@@ -33,19 +34,22 @@ pub enum Payload {
         topology: HashMap<String, Vec<String>>,
     },
     TopologyOk,
+    Error {
+        code: usize,
+        text: String,
+    },
+    // NOTE: Custom Payloads
     SyncRequest {
         start: usize,
         end: usize,
     },
     Batch {
-        messages: Vec<Message>,
+        packets: Vec<Packet>,
     },
-    Ack,
+    Ack {
+        messages: Vec<usize>,
+    },
     Forward {
         packet: Box<Packet>,
-    },
-    Error {
-        code: usize,
-        text: String,
     },
 }

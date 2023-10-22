@@ -1,4 +1,4 @@
-use crate::types::packet_handler::NodeInfo;
+use crate::types::node_info::NodeInfo;
 
 use std::collections::{HashMap, HashSet};
 

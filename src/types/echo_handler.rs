@@ -1,9 +1,6 @@
 use crate::types::{
-    message::Message,
-    message_handler::MessageHandler,
-    packet::Packet,
-    packet_handler::{MessageResponse, NodeInfo},
-    payload::Payload,
+    message::Message, message_handler::MessageHandler, node_info::NodeInfo, packet::Packet,
+    message_response::MessageResponse, payload::Payload,
 };
 
 pub struct EchoHandler {}
@@ -13,8 +10,7 @@ impl MessageHandler for EchoHandler {
         &mut self,
         packet: &Packet,
         _state: &NodeInfo,
-        send: &mut dyn FnMut(MessageResponse),
-    ) {
+    ) -> Option<Vec<MessageResponse>> {
         if let Packet {
             src,
             body:
@@ -26,12 +22,14 @@ impl MessageHandler for EchoHandler {
             ..
         } = packet
         {
-            send(MessageResponse {
+            Some(vec![MessageResponse::NoAck {
                 src: Option::None,
                 dest: src.clone(),
                 in_reply_to: *msg_id,
                 payload: Payload::EchoOk { echo: echo.clone() },
-            });
+            }])
+        } else {
+            None 
         }
     }
 }

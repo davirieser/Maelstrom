@@ -1,9 +1,6 @@
 use crate::types::{
-    message::Message,
-    message_handler::MessageHandler,
-    packet::Packet,
-    packet_handler::{MessageResponse, NodeInfo},
-    payload::Payload,
+    message::Message, message_handler::MessageHandler, message_response::MessageResponse,
+    node_info::NodeInfo, packet::Packet, payload::Payload,
 };
 
 pub struct BroadcastHandler {
@@ -15,8 +12,7 @@ impl MessageHandler for BroadcastHandler {
         &mut self,
         packet: &Packet,
         state: &NodeInfo,
-        send: &mut dyn FnMut(MessageResponse),
-    ) {
+    ) -> Option<Vec<MessageResponse>> {
         match packet {
             Packet {
                 src,
@@ -31,41 +27,37 @@ impl MessageHandler for BroadcastHandler {
                 self.messages.push(*message);
                 match state.broadcast_topology.get(src) {
                     // Node is an internal Server Node
-                    Some(nodes) => {
-                        eprintln!(
-                            "Node {} forwarding Broadcast {} to {:?}",
-                            state.node_id, message, nodes
-                        );
-                        for server in nodes {
-                            send(MessageResponse {
+                    Some(nodes) => Some(
+                        nodes
+                            .iter()
+                            .map(|n| MessageResponse::NoAck {
                                 src: Option::Some(src.clone()),
-                                dest: server.clone(),
+                                dest: n.clone(),
                                 in_reply_to: Option::None,
                                 payload: Payload::Broadcast { message: *message },
-                            });
-                        }
-                    }
+                            })
+                            .collect(),
+                    ),
                     // Node is an external Client Node
                     None => {
-                        send(MessageResponse {
+                        let nodes = state.broadcast_topology[&state.node_id].iter();
+                        let mut responses = Vec::with_capacity(nodes.len() + 1);
+
+                        responses.push(MessageResponse::NoAck {
                             src: Option::None,
                             dest: src.clone(),
                             in_reply_to: *msg_id,
                             payload: Payload::BroadcastOk,
                         });
-                        let nodes = state.broadcast_topology[&state.node_id].iter();
-                        eprintln!(
-                            "Node {} sending first Broadcast {} to {:?}",
-                            state.node_id, message, nodes
-                        );
-                        for server in nodes {
-                            send(MessageResponse {
-                                src: Option::Some(state.node_id.clone()),
-                                dest: server.clone(),
-                                in_reply_to: Option::None,
-                                payload: Payload::Broadcast { message: *message },
-                            });
-                        }
+
+                        responses.extend(nodes.map(|n| MessageResponse::NoAck {
+                            src: Option::Some(state.node_id.clone()),
+                            dest: n.clone(),
+                            in_reply_to: Option::None,
+                            payload: Payload::Broadcast { message: *message },
+                        }));
+
+                        Some(responses)
                     }
                 }
             }
@@ -78,17 +70,15 @@ impl MessageHandler for BroadcastHandler {
                         ..
                     },
                 ..
-            } => {
-                send(MessageResponse {
-                    src: Option::None,
-                    dest: src.clone(),
-                    in_reply_to: *msg_id,
-                    payload: Payload::ReadOk {
-                        messages: self.messages.clone(),
-                    },
-                });
-            }
-            _ => {}
+            } => Some(vec![MessageResponse::NoAck {
+                src: Option::None,
+                dest: src.clone(),
+                in_reply_to: *msg_id,
+                payload: Payload::ReadOk {
+                    messages: self.messages.clone(),
+                },
+            }]),
+            _ => None,
         }
     }
 }
