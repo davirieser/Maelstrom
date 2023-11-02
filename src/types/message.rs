@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::types::payload::Payload;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Message {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub msg_id: Option<usize>,

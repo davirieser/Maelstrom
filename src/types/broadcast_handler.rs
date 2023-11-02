@@ -1,6 +1,6 @@
 use crate::types::{
-    message::Message, message_handler::MessageHandler, message_response::MessageResponse,
-    node_info::NodeInfo, packet::Packet, payload::Payload,
+    collection::Collection, message::Message, message_handler::MessageHandler,
+    message_response::MessageResponse, node_info::NodeInfo, packet::Packet, payload::Payload,
 };
 
 pub struct BroadcastHandler {
@@ -8,11 +8,7 @@ pub struct BroadcastHandler {
 }
 
 impl MessageHandler for BroadcastHandler {
-    fn handle_message(
-        &mut self,
-        packet: &Packet,
-        state: &NodeInfo,
-    ) -> Option<Vec<MessageResponse>> {
+    fn handle_message(&mut self, packet: &Packet, state: &NodeInfo) -> Collection<MessageResponse> {
         match packet {
             Packet {
                 src,
@@ -27,7 +23,7 @@ impl MessageHandler for BroadcastHandler {
                 self.messages.push(*message);
                 match state.broadcast_topology.get(src) {
                     // Node is an internal Server Node
-                    Some(nodes) => Some(
+                    Some(nodes) => Collection::Multiple(
                         nodes
                             .iter()
                             .map(|n| MessageResponse::NoAck {
@@ -57,7 +53,7 @@ impl MessageHandler for BroadcastHandler {
                             payload: Payload::Broadcast { message: *message },
                         }));
 
-                        Some(responses)
+                        Collection::Multiple(responses)
                     }
                 }
             }
@@ -70,15 +66,15 @@ impl MessageHandler for BroadcastHandler {
                         ..
                     },
                 ..
-            } => Some(vec![MessageResponse::NoAck {
+            } => Collection::One(MessageResponse::NoAck {
                 src: Option::None,
                 dest: src.clone(),
                 in_reply_to: *msg_id,
                 payload: Payload::ReadOk {
                     messages: self.messages.clone(),
                 },
-            }]),
-            _ => None,
+            }),
+            _ => Collection::None,
         }
     }
 }

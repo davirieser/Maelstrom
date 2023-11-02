@@ -1,6 +1,6 @@
 use crate::types::{
-    message::Message, message_handler::MessageHandler, node_info::NodeInfo, packet::Packet,
-    message_response::MessageResponse, payload::Payload,
+    collection::Collection, message::Message, message_handler::MessageHandler,
+    message_response::MessageResponse, node_info::NodeInfo, packet::Packet, payload::Payload,
 };
 
 pub struct EchoHandler {}
@@ -10,7 +10,7 @@ impl MessageHandler for EchoHandler {
         &mut self,
         packet: &Packet,
         _state: &NodeInfo,
-    ) -> Option<Vec<MessageResponse>> {
+    ) -> Collection<MessageResponse> {
         if let Packet {
             src,
             body:
@@ -22,14 +22,14 @@ impl MessageHandler for EchoHandler {
             ..
         } = packet
         {
-            Some(vec![MessageResponse::NoAck {
+            Collection::One(MessageResponse::NoAck {
                 src: Option::None,
                 dest: src.clone(),
                 in_reply_to: *msg_id,
                 payload: Payload::EchoOk { echo: echo.clone() },
-            }])
+            })
         } else {
-            None 
+            Collection::None
         }
     }
 }

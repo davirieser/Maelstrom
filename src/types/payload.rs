@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::types::packet::Packet;
+use crate::types::{message::Message, packet::Packet};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Payload {
     // NOTE: Standard Payloads
@@ -39,14 +39,12 @@ pub enum Payload {
         text: String,
     },
     // NOTE: Custom Payloads
-    SyncRequest {
-        start: usize,
-        end: usize,
-    },
+    SyncRequest,
     Batch {
-        packets: Vec<Packet>,
+        messages: Vec<Message>,
     },
-    Ack {
+    Ack,
+    MultiAck {
         messages: Vec<usize>,
     },
     Forward {

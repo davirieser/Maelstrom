@@ -1,6 +1,6 @@
 
 TEST_NAME ?= echo
-TIME_LIMIT ?= 20 
+TIME_LIMIT ?= 10 
 RATE ?= 100
 NODES ?= 25
 
