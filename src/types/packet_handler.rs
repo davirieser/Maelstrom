@@ -120,7 +120,7 @@ where
         if self.state.is_some() {
             match self.stdin.next() {
                 Some(Ok(packet)) => {
-                    debug_eprintln!("Got {:?}", packet);
+                    debug_eprintln!("Got {:#?}", packet);
 
                     let mut send_sync_request = false;
                     if let Some(mut conn_info) = self.get_state_mut().conn_info.get_mut(&packet.src)
@@ -279,8 +279,8 @@ where
                 state.broadcast_topology = build_broadcast_topology(state, &topology);
                 state.topology = topology;
 
-                debug_eprintln!("Got Topology: {:?}", state.topology);
-                debug_eprintln!("Built Broadcast Topology: {:?}", state.broadcast_topology);
+                debug_eprintln!("Got Topology: {:#?}", state.topology);
+                debug_eprintln!("Built Broadcast Topology: {:#?}", state.broadcast_topology);
 
                 Collection::One(Packet {
                     src: self.get_node_id().clone(),
@@ -502,7 +502,7 @@ where
     where
         O: Write,
     {
-        debug_eprintln!("Send {:?}", packet);
+        debug_eprintln!("Send {:#?}", packet);
 
         let _ = serde_json::to_writer(stdout.by_ref(), &packet);
         let _ = stdout.write(&[b'\n']);

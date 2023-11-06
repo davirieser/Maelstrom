@@ -36,7 +36,7 @@ impl MessageHandler for BroadcastHandler {
                     ),
                     // Node is an external Client Node
                     None => {
-                        let nodes = state.broadcast_topology[&state.node_id].iter();
+                        let nodes = &state.broadcast_topology[&state.node_id];
                         let mut responses = Vec::with_capacity(nodes.len() + 1);
 
                         responses.push(MessageResponse::NoAck {
@@ -46,7 +46,7 @@ impl MessageHandler for BroadcastHandler {
                             payload: Payload::BroadcastOk,
                         });
 
-                        responses.extend(nodes.map(|n| MessageResponse::NoAck {
+                        responses.extend(nodes.iter().map(|n| MessageResponse::NoAck {
                             src: Option::Some(state.node_id.clone()),
                             dest: n.clone(),
                             in_reply_to: Option::None,
