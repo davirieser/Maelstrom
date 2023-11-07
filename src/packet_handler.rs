@@ -1,7 +1,7 @@
 #![allow(unused)]
 
+use debug_print::{debug_eprint, debug_eprintln};
 use serde_json::de::{IoRead, StreamDeserializer};
-use debug_print::{debug_eprintln, debug_eprint};
 use std::{
     cmp::Ordering,
     collections::HashMap,
@@ -71,7 +71,7 @@ where
                 .collect();
             let server_nodes: Vec<String> = node_ids
                 .iter()
-                .filter(|id| id.starts_with('n') && **id != node_id)
+                .filter(|id| id.starts_with('n'))
                 .cloned()
                 .collect();
 
@@ -154,7 +154,7 @@ where
                                 msg_id: None,
                                 in_reply_to: None,
                                 payload: Payload::SyncRequest,
-                            }
+                            },
                         }),
                         false => Collection::None,
                     };
@@ -165,7 +165,7 @@ where
                             self.write_packet(packet);
                         }
                         Collection::Multiple(packets) => {
-                            let dict : HashMap<String, Vec<Message>> =
+                            let dict: HashMap<String, Vec<Message>> =
                                 packets.into_iter().fold(HashMap::new(), |mut acc, packet| {
                                     acc.entry(packet.dest).or_default().push(packet.body);
                                     acc
@@ -174,13 +174,13 @@ where
                             for kvp in dict {
                                 let (dest, messages) = kvp;
                                 match messages.len() {
-                                    0 => {},
+                                    0 => {}
                                     1 => self.write_packet(Packet {
                                         src: self.get_node_id().clone(),
                                         dest,
                                         body: messages.into_iter().next().unwrap(),
                                     }),
-                                    _ => self.write_batch(dest, messages)
+                                    _ => self.write_batch(dest, messages),
                                 }
                             }
                         }
@@ -200,10 +200,8 @@ where
             body: Message {
                 msg_id: None,
                 in_reply_to: None,
-                payload: Payload::Batch {
-                    messages,
-                }
-            }
+                payload: Payload::Batch { messages },
+            },
         };
         Self::write_packet_inner(self.stdout.by_ref(), &packet);
 
@@ -213,7 +211,7 @@ where
                     self.add_packet_to_ack(Packet {
                         src: self.get_node_id().clone(),
                         dest: dest.clone(),
-                        body: message
+                        body: message,
                     });
                 }
             }
@@ -276,7 +274,8 @@ where
             } => {
                 // NOTE: Rebuilding the Topology every time a Topology Packet is sent is fine.
                 let state = self.get_state_mut();
-                state.broadcast_topology = build_broadcast_topology(state, &topology);
+                state.broadcast_topology =
+                    build_broadcast_topology(&state.node_id, &state.server_nodes, &topology);
                 state.topology = topology;
 
                 debug_eprintln!("Got Topology: {:#?}", state.topology);
@@ -316,11 +315,15 @@ where
                     .map(|m| &mut m.un_ack_messages)
                 {
                     let messages = std::mem::replace(messages, Vec::with_capacity(0));
-                    messages.into_iter().map(|m| Packet {
-                        src: self.get_node_id().clone(),
-                        dest: src.clone(),
-                        body: m
-                    }).collect::<Vec<Packet>>().into()
+                    messages
+                        .into_iter()
+                        .map(|m| Packet {
+                            src: self.get_node_id().clone(),
+                            dest: src.clone(),
+                            body: m,
+                        })
+                        .collect::<Vec<Packet>>()
+                        .into()
                 } else {
                     Collection::None
                 }

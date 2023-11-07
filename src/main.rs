@@ -2,10 +2,25 @@
 
 use std::io::{stdin, stdout};
 
-mod types;
-use types::{
+pub mod packet_handler;
+pub use packet_handler::PacketHandler;
+
+pub mod types;
+pub use types::{
+    collection::Collection,
+    message::Message,
+    message_handler::MessageHandler,
+    message_response::MessageResponse,
+    node_info::{NodeConnectionInfo, NodeInfo},
+    packet::Packet,
+    payload::Payload,
+    topology::{BroadcastTopology, Topology},
+};
+
+pub mod handlers;
+pub use handlers::{
     broadcast_handler::BroadcastHandler, echo_handler::EchoHandler,
-    generate_handler::GenerateHandler, packet_handler::PacketHandler,
+    generate_handler::GenerateHandler,
 };
 
 fn main() {

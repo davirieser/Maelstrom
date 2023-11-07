@@ -59,12 +59,11 @@ impl<T> From<Option<Vec<T>>> for Collection<T> {
     fn from(opt: Option<Vec<T>>) -> Self {
         match opt {
             None => Collection::None,
-            Some(arr) => 
-                match arr.len() {
-                    0 => Collection::None,
-                    1 => Collection::One(arr.into_iter().next().unwrap()),
-                    _ => Collection::Multiple(arr),
-                }
+            Some(arr) => match arr.len() {
+                0 => Collection::None,
+                1 => Collection::One(arr.into_iter().next().unwrap()),
+                _ => Collection::Multiple(arr),
+            },
         }
     }
 }

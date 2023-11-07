@@ -4,7 +4,7 @@ use crate::types::{
 };
 
 pub struct GenerateHandler {
-    pub counter: usize
+    pub counter: usize,
 }
 
 impl MessageHandler for GenerateHandler {

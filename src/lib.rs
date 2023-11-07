@@ -1,15 +1,32 @@
 #![allow(non_snake_case)]
 
-mod types;
+pub mod packet_handler;
+pub use packet_handler::PacketHandler;
+
+pub mod types;
+pub use types::{
+    collection::Collection,
+    message::Message,
+    message_handler::MessageHandler,
+    message_response::MessageResponse,
+    node_info::{NodeConnectionInfo, NodeInfo},
+    packet::Packet,
+    payload::Payload,
+    topology::{BroadcastTopology, Topology},
+};
+
+pub mod handlers;
+pub use handlers::{
+    broadcast_handler::BroadcastHandler, echo_handler::EchoHandler,
+    generate_handler::GenerateHandler,
+};
 
 #[cfg(test)]
 mod test {
-    use crate::types::{
-        helpers::{build_broadcast_topology, is_lower_node_id},
-        packet_handler::NodeInfo,
-    };
+    use crate::types::helpers::{build_broadcast_topology, is_lower_node_id};
+    use crate::{BroadcastTopology, Topology};
     use std::cmp::Ordering;
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
 
     fn cmp_node_ids(id1: &str, id2: &str) -> Ordering {
         (id1[1..].parse::<usize>().unwrap_or(0)).cmp(&id2[1..].parse::<usize>().unwrap_or(0))
@@ -24,7 +41,35 @@ mod test {
 
     #[test]
     fn test_build_broadcast_topology1() {
-        let topology: HashMap<String, Vec<String>> = HashMap::from([
+        let topology: Topology = HashMap::from([]);
+
+        assert!(test_build_broadcast_topology_internal(topology));
+    }
+    #[test]
+    fn test_build_broadcast_topology2() {
+        let topology: Topology = HashMap::from([(String::from("n0"), vec![])]);
+
+        assert!(test_build_broadcast_topology_internal(topology));
+    }
+    #[test]
+    fn test_build_broadcast_topology3() {
+        let topology: Topology =
+            HashMap::from([(String::from("n0"), vec![]), (String::from("n1"), vec![])]);
+
+        assert!(!test_build_broadcast_topology_internal(topology));
+    }
+    #[test]
+    fn test_build_broadcast_topology4() {
+        let topology: Topology = HashMap::from([
+            (String::from("n0"), vec![String::from("n1")]),
+            (String::from("n1"), vec![String::from("n0")]),
+        ]);
+
+        assert!(test_build_broadcast_topology_internal(topology));
+    }
+    #[test]
+    fn test_build_broadcast_topology5() {
+        let topology: Topology = HashMap::from([
             (
                 String::from("n0"),
                 vec![String::from("n1"), String::from("n2")],
@@ -42,41 +87,111 @@ mod test {
                 vec![String::from("n1"), String::from("n2")],
             ),
         ]);
-        let calculated: HashMap<String, Vec<String>> = HashMap::from([
+
+        assert!(test_build_broadcast_topology_internal(topology));
+    }
+    #[test]
+    fn test_build_broadcast_topology6() {
+        let topology: Topology = HashMap::from([
             (
                 String::from("n0"),
-                vec![String::from("n1"), String::from("n2")],
+                vec![String::from("n1"), String::from("n3")],
             ),
-            (String::from("n1"), vec![String::from("n2")]),
-            (String::from("n2"), vec![String::from("n1")]),
-            (String::from("n3"), vec![]),
+            (
+                String::from("n1"),
+                vec![String::from("n0"), String::from("n2"), String::from("n4")],
+            ),
+            (
+                String::from("n2"),
+                vec![String::from("n1"), String::from("n5")],
+            ),
+            (
+                String::from("n3"),
+                vec![String::from("n0"), String::from("n4")],
+            ),
+            (
+                String::from("n4"),
+                vec![String::from("n1"), String::from("n3"), String::from("n5")],
+            ),
+            (
+                String::from("n5"),
+                vec![String::from("n2"), String::from("n4")],
+            ),
         ]);
-        // TODO: Need to calculate for "n1", "n2" and "n3"
 
-        let node_ids: Vec<String> = ["n0", "n1", "n2", "n3"]
-            .into_iter()
-            .map(|s| String::from(s))
-            .collect();
-        let server_nodes = node_ids.clone();
+        assert!(test_build_broadcast_topology_internal(topology));
+        assert!(false);
+    }
 
-        let mut state = NodeInfo {
-            msg_number: 0,
-            node_number: 4,
-            node_id: String::from("n0"),
-            node_ids,
-            server_nodes,
-            client_nodes: vec![],
-            topology: HashMap::new(),
-            broadcast_topology: HashMap::new(),
-            messages: Default::default(),
-            msg_ids: Default::default(),
-        };
-        let mut broadcast_topology = build_broadcast_topology(&mut state, &topology);
+    fn test_build_broadcast_topology_internal(mut topology: Topology) -> bool {
+        let all_topologies = build_broadcast_topology_internal(topology);
+        println!("All Topologies: {:#?}", all_topologies);
 
-        for vec in broadcast_topology.values_mut() {
-            vec.sort_by(|s1, s2| cmp_node_ids(s1.as_str(), s2.as_str()));
+        let complete_topology = collect_topologies(all_topologies);
+        println!("Complete Topology: {:#?}", complete_topology);
+
+        check_topology_is_complete(complete_topology)
+    }
+    fn check_topology_is_complete(mut topology: BroadcastTopology) -> bool {
+        let mut valid = true;
+        let mut nodes: HashSet<String> = topology.keys().cloned().collect();
+
+        for node in nodes.iter() {
+            // TODO: Check if any nodes are in the topology multiple times => Redundant Broadcast
+            let adj = topology.get_mut(node).unwrap().iter().cloned().collect();
+
+            let mut diff = nodes.difference(&adj).collect::<Vec<&String>>();
+            let pos = diff.iter().position(|&i| i == node);
+            if !pos.is_some() {
+                println!("Self referencial Broadcast for Node {:?}", node);
+                valid &= false;
+            } else {
+                diff.remove(pos.unwrap());
+            }
+            if !diff.is_empty() {
+                println!(
+                    "Nodes {:?} are missing for {:?}",
+                    diff.into_iter().collect::<Vec<&String>>(),
+                    node
+                );
+                valid &= false;
+            }
         }
 
-        assert_eq!(calculated, broadcast_topology);
+        valid
+    }
+    fn build_broadcast_topology_internal(
+        base_topology: Topology,
+    ) -> HashMap<String, BroadcastTopology> {
+        let mut nodes: Vec<String> = base_topology.keys().cloned().collect();
+
+        let mut complete_topology = HashMap::new();
+        for node in nodes.iter() {
+            let mut broadcast_topology = build_broadcast_topology(node, &nodes, &base_topology);
+
+            complete_topology.insert(node.clone(), broadcast_topology);
+        }
+
+        complete_topology
+    }
+    fn collect_topologies(topologies: HashMap<String, BroadcastTopology>) -> Topology {
+        let mut nodes: Vec<String> = topologies.keys().cloned().collect();
+        let mut complete_topology: Topology = HashMap::with_capacity(nodes.len());
+
+        for node in nodes.iter() {
+            let topology = &topologies[node];
+            for node in nodes.iter() {
+                complete_topology
+                    .entry(node.to_owned())
+                    .or_default()
+                    .extend(topology[node].iter().cloned());
+            }
+        }
+
+        for node in nodes.iter() {
+            let mut vec = complete_topology.get_mut(node).unwrap();
+        }
+
+        complete_topology
     }
 }

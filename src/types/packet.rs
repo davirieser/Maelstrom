@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use crate::types::message::Message;
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Packet {
@@ -7,4 +7,3 @@ pub struct Packet {
     pub dest: String,
     pub body: Message,
 }
-
